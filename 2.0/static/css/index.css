@@ -1,0 +1,22 @@
+.header {
+    display: flex;
+    justify-content: center;
+}
+.templates {
+    display: flex;
+    justify-content: center;
+    margin-top: 5%;
+    gap: 30px;
+}
+.template1:hover {
+    transform: scale(1.1);
+    transition: transform .2s;
+}
+.template2:hover {
+    transform: scale(1.1);
+    transition: transform .2s;
+}
+.template3:hover {
+    transform: scale(1.1);
+    transition: transform .2s;
+}

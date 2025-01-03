@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Шаблон грамоты №1</title>
+    <link href="../static/css/template1.css" rel="stylesheet">
+</head>
+<body>
+<div class="container">
+    <h1>Введите ваши данные:</h1>
+    
+    <!-- Форма отправки данных -->
+    <form action="/generate-pdf" method="post">
+        <input type="text" id="fullName" name="fullName" placeholder="ФИО">
+        <br><br>
+        <button type="submit">Скачать в PDF</button>
+    </form>
+    <br><br>
+    <!-- Изображение грамоты -->
+    <img src="../static/images/template1_ext.jpg" alt="грамота" id="certificateImage">
+    <!-- Холст для наложения текста -->
+    <canvas id="overlayCanvas"></canvas>
+</div>
+<!-- Подключение библиотеки jspdf -->
+<script src="../static/js/template1.js"></script>
+</body>
+</html>
