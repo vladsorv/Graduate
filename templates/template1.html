@@ -16,6 +16,14 @@
         <br><br>
         <button type="submit">Скачать в PDF</button>
     </form>
+
+    <!-- Форма для загрузки CSV-файла -->
+    <form id="csvForm" enctype="multipart/form-data" method="post" action="/process-csv">
+        <input type="file" id="csvFile" name="csvfile" accept="text/csv">
+        <br><br>
+        <button type="submit">Обработать CSV-файл</button>
+    </form>
+
     <br><br>
     <!-- Изображение грамоты -->
     <img src="../static/images/template1_ext.jpg" alt="грамота" id="certificateImage">
@@ -24,5 +32,6 @@
 </div>
 <!-- Подключение библиотеки jspdf -->
 <script src="../static/js/template1.js"></script>
+
 </body>
 </html>

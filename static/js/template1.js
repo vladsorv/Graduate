@@ -34,3 +34,20 @@ function drawTextOnCertificate(text) {
     ctx.fillText(text, x, y);
 }
 
+// Обработчик загрузки CSV-файла
+document.getElementById('csvForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+    const formData = new FormData(this);
+    fetch('/process-csv', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        alert(`Готово! Грамоты созданы для ${data.count} записей.`);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+});
+

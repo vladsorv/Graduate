@@ -38,3 +38,14 @@ canvas {
     transform: translate(-50%, -50%);
     pointer-events: none;
 }
+
+#csvFile {
+    margin-top: 4%;
+    padding: 10px 20px;
+    cursor: pointer;
+    background-color: #828e8f;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+}
