@@ -8,7 +8,11 @@ import csv
 from werkzeug.utils import secure_filename
 import os
 from PIL import Image, ImageDraw, ImageFont
-
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
 
 import logging
 
@@ -27,6 +31,10 @@ def allowed_file(filename):
 # Создаем экземпляр приложения Flask
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = r'C:\Users\maslo\Downloads'
+
+# Регистрация шрифта с поддержкой Unicode
+FONT_PATH = "static/fonts/DejaVuSans.ttf"
+pdfmetrics.registerFont(TTFont("DejaVu", FONT_PATH))
 # Определяем маршрут для главной страницы
 @app.route('/')
 def index():
@@ -127,52 +135,47 @@ def generate_certificate(name):
     output_filename = os.path.join(r'C:\Users\maslo\Downloads', f"{name.replace(' ', '_')}.pdf")
     pdf.output(output_filename)
 
-@app.route("/save-template", methods=["POST"])
+@app.route('/save-template', methods=['POST'])
 def save_template():
-    data = request.json
-    image_data = data.get("imageData", "")
-    text_blocks = data.get("textBlocks", [])
-
-    if not image_data:
-        logger.error("Нет данных изображения!")
-        return jsonify({"success": False, "error": "Нет данных изображения."})
-
     try:
-        # Декодируем Base64-данные изображения
+        data = request.json
+        image_data = data.get('imageData')
+        text_blocks = data.get('textBlocks', [])
+
+        if not image_data:
+            raise ValueError("Нет данных изображения")
+
+        # Декодируем Base64 изображение
         header, encoded = image_data.split(",", 1)
         image_bytes = io.BytesIO(base64.b64decode(encoded))
+        img = Image.open(image_bytes)
 
-        # Загружаем изображение через Pillow
-        image = Image.open(image_bytes)
+        # Конвертируем RGBA в RGB (если необходимо)
+        if img.mode == 'RGBA':
+            img = img.convert('RGB')
 
-        # Создаем PDF
-        pdf = FPDF('P', 'mm', 'A4')
-        pdf.add_page()
+        # Сохраняем изображение во временный файл
+        temp_image_path = "output/temp_image.jpg"
+        os.makedirs("output", exist_ok=True)
+        img.save(temp_image_path, format="JPEG")
 
-        # Сохраняем изображение как временный файл, чтобы добавить в PDF
-        temp_image_path = os.path.join(app.config['UPLOAD_FOLDER'], "temp_image.png")
-        image.save(temp_image_path)
+        # Создаем PDF с шаблоном и текстом
+        output_pdf_path = "output/template_with_text.pdf"
+        pdf_canvas = canvas.Canvas(output_pdf_path, pagesize=(img.width, img.height))
 
-        # Вставляем изображение в PDF
-        pdf.image(temp_image_path, x=0, y=0, w=210, h=297)  # A4 размеры в мм
+        # Добавляем фоновое изображение
+        pdf_canvas.drawImage(temp_image_path, 0, 0, width=img.width, height=img.height)
 
-        # Добавляем текстовые блоки на PDF
-        pdf.set_font("Arial", size=12)
-        for block in text_blocks:
-            x = block["x"] * 210 / image.width  # Пропорциональный перевод координат
-            y = block["y"] * 297 / image.height
-            pdf.set_xy(x, y)
-            pdf.cell(0, 10, block["text"], ln=True)
+        # Завершаем PDF-документ
+        pdf_canvas.save()
 
-        # Сохраняем PDF
-        output_pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], "final_template.pdf")
-        pdf.output(output_pdf_path)
-
-        logger.debug(f"PDF сохранён в {output_pdf_path}")
+        # Удаляем временный файл изображения
+        os.remove(temp_image_path)
 
         return jsonify({"success": True, "downloadUrl": f"/download/{output_pdf_path}"})
+
     except Exception as e:
-        logger.exception(f"Ошибка при обработке изображения: {str(e)}")
+        app.logger.error(f"Ошибка при обработке изображения: {e}")
         return jsonify({"success": False, "error": str(e)})
 
 
