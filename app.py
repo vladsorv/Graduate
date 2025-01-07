@@ -1,17 +1,21 @@
+import base64
 import re
+from tkinter import Image
 from flask import Flask, jsonify, render_template, request, send_file
 import io
 from fpdf import FPDF
 import csv
 from werkzeug.utils import secure_filename
 import os
+from PIL import Image, ImageDraw, ImageFont
 
 
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Список разрешённых расширений файлов
 ALLOWED_EXTENSIONS = {'csv'}
@@ -66,6 +70,10 @@ def generate_pdf():
 def template1():
     return render_template('template1.html')
 
+@app.route('/your_temp')
+def your_temp():
+    return render_template('your_temp.html')
+
 # Маршрут для обработки CSV-файла
 @app.route('/process-csv', methods=['POST'])
 def process_csv():
@@ -118,6 +126,59 @@ def generate_certificate(name):
     # Сохраняем PDF
     output_filename = os.path.join(r'C:\Users\maslo\Downloads', f"{name.replace(' ', '_')}.pdf")
     pdf.output(output_filename)
+
+@app.route("/save-template", methods=["POST"])
+def save_template():
+    data = request.json
+    image_data = data.get("imageData", "")
+    text_blocks = data.get("textBlocks", [])
+
+    if not image_data:
+        logger.error("Нет данных изображения!")
+        return jsonify({"success": False, "error": "Нет данных изображения."})
+
+    try:
+        # Декодируем Base64-данные изображения
+        header, encoded = image_data.split(",", 1)
+        image_bytes = io.BytesIO(base64.b64decode(encoded))
+
+        # Загружаем изображение через Pillow
+        image = Image.open(image_bytes)
+
+        # Создаем PDF
+        pdf = FPDF('P', 'mm', 'A4')
+        pdf.add_page()
+
+        # Сохраняем изображение как временный файл, чтобы добавить в PDF
+        temp_image_path = os.path.join(app.config['UPLOAD_FOLDER'], "temp_image.png")
+        image.save(temp_image_path)
+
+        # Вставляем изображение в PDF
+        pdf.image(temp_image_path, x=0, y=0, w=210, h=297)  # A4 размеры в мм
+
+        # Добавляем текстовые блоки на PDF
+        pdf.set_font("Arial", size=12)
+        for block in text_blocks:
+            x = block["x"] * 210 / image.width  # Пропорциональный перевод координат
+            y = block["y"] * 297 / image.height
+            pdf.set_xy(x, y)
+            pdf.cell(0, 10, block["text"], ln=True)
+
+        # Сохраняем PDF
+        output_pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], "final_template.pdf")
+        pdf.output(output_pdf_path)
+
+        logger.debug(f"PDF сохранён в {output_pdf_path}")
+
+        return jsonify({"success": True, "downloadUrl": f"/download/{output_pdf_path}"})
+    except Exception as e:
+        logger.exception(f"Ошибка при обработке изображения: {str(e)}")
+        return jsonify({"success": False, "error": str(e)})
+
+
+@app.route("/download/<path:filename>")
+def download_file(filename):
+    return send_file(filename, as_attachment=True)
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,0 +1,35 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f9;
+    color: #333;
+    margin: 0;
+    padding: 0;
+}
+
+h1 {
+    text-align: center;
+    margin: 20px 0;
+}
+
+#editor-container {
+    width: 90%;
+    margin: 0 auto;
+    background: #fff;
+    border: 1px solid #ddd;
+    padding: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+#templateArea {
+    margin-top: 20px;
+    text-align: center;
+}
+
+canvas {
+    border: 1px solid #ddd;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    width: 794px; /* Фиксированная ширина отображения */
+    height: 1123px; /* Фиксированная высота отображения */
+    display: block;
+    margin: 0 auto;
+}

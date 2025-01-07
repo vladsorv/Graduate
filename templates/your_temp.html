@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Template Editor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/your_temp.css') }}">
+</head>
+<body>
+    <h1>Редактор шаблонов</h1>
+    <div id="editor-container">
+        <input type="file" id="templateUpload" accept="image/*">
+        <button id="saveTemplate">Сохранить</button>
+        <div id="templateArea">
+            <canvas id="templateCanvas"></canvas>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='js/your_temp.js') }}"></script>
+</body>
+</html>
