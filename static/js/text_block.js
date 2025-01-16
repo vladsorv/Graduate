@@ -214,10 +214,55 @@ document.addEventListener("mousemove", (event) => {
 
     if (isResizing && selectedBlock) {
         if (resizeDirection === "resize-x") {
-            selectedBlock.width = Math.max(50, x - selectedBlock.x);
-        } else if (resizeDirection === "resize-y") {
-            selectedBlock.height = Math.max(50, y - selectedBlock.y);
+            // Перетаскивание левой границы
+            if (Math.abs(x - selectedBlock.x) <= HANDLE_SIZE) {
+                const deltaWidth = selectedBlock.x - x;
+                const newWidth = Math.max(50, selectedBlock.width + deltaWidth);
+                selectedBlock.x = selectedBlock.x + (selectedBlock.width - newWidth);
+                selectedBlock.width = newWidth;
+            }
+            // Перетаскивание правой границы
+            else if (Math.abs(x - (selectedBlock.x + selectedBlock.width)) <= HANDLE_SIZE) {
+                const newWidth = Math.max(50, x - selectedBlock.x);
+                selectedBlock.width = newWidth;
+            }
+
+            // Логика для уменьшения ширины как внутрь, так и наружу
+            if (x < selectedBlock.x) {
+                const newWidth = Math.max(50, selectedBlock.width + (selectedBlock.x - x));
+                selectedBlock.x = x;
+                selectedBlock.width = newWidth;
+            } else if (x > selectedBlock.x + selectedBlock.width) {
+                const newWidth = Math.max(50, x - selectedBlock.x);
+                selectedBlock.width = newWidth;
+            }
         }
+
+        if (resizeDirection === "resize-y") {
+            // Перетаскивание верхней границы
+            if (Math.abs(y - selectedBlock.y) <= HANDLE_SIZE) {
+                const deltaHeight = selectedBlock.y - y;
+                const newHeight = Math.max(50, selectedBlock.height + deltaHeight);
+                selectedBlock.y = selectedBlock.y + (selectedBlock.height - newHeight);
+                selectedBlock.height = newHeight;
+            }
+            // Перетаскивание нижней границы
+            else if (Math.abs(y - (selectedBlock.y + selectedBlock.height)) <= HANDLE_SIZE) {
+                const newHeight = Math.max(50, y - selectedBlock.y);
+                selectedBlock.height = newHeight;
+            }
+
+            // Логика для уменьшения высоты как внутрь, так и наружу
+            if (y < selectedBlock.y) {
+                const newHeight = Math.max(50, selectedBlock.height + (selectedBlock.y - y));
+                selectedBlock.y = y;
+                selectedBlock.height = newHeight;
+            } else if (y > selectedBlock.y + selectedBlock.height) {
+                const newHeight = Math.max(50, y - selectedBlock.y);
+                selectedBlock.height = newHeight;
+            }
+        }
+
         drawCanvas();
         return;
     }
@@ -246,6 +291,82 @@ document.addEventListener("mousemove", (event) => {
     }
 });
 
+document.addEventListener("mousemove", (event) => {
+    const rect = templateCanvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    if (isDragging && selectedBlock) {
+        // Перемещение блока
+        const deltaX = mouseX - dragStart.x;
+        const deltaY = mouseY - dragStart.y;
+
+        selectedBlock.x += deltaX;
+        selectedBlock.y += deltaY;
+
+        dragStart = { x: mouseX, y: mouseY };
+        drawCanvas();
+        return;
+    }
+
+    if (isResizing && selectedBlock) {
+        const minSize = 50; // Минимальный размер блока
+
+        if (resizeDirection === "resize-x") {
+            if (mouseX < selectedBlock.x + selectedBlock.width / 2) {
+                // Уменьшение влево
+                const newWidth = selectedBlock.x + selectedBlock.width - mouseX;
+                selectedBlock.x = mouseX;
+                selectedBlock.width = Math.max(minSize, newWidth);
+            } else {
+                // Увеличение вправо
+                const newWidth = mouseX - selectedBlock.x;
+                selectedBlock.width = Math.max(minSize, newWidth);
+            }
+        }
+
+        if (resizeDirection === "resize-y") {
+            if (mouseY < selectedBlock.y + selectedBlock.height / 2) {
+                // Уменьшение вверх
+                const newHeight = selectedBlock.y + selectedBlock.height - mouseY;
+                selectedBlock.y = mouseY;
+                selectedBlock.height = Math.max(minSize, newHeight);
+            } else {
+                // Увеличение вниз
+                const newHeight = mouseY - selectedBlock.y;
+                selectedBlock.height = Math.max(minSize, newHeight);
+            }
+        }
+
+        // Принудительное обновление холста
+        drawCanvas();
+        return;
+    }
+
+    // Обновление курсора
+    let cursorSet = false;
+    textBlocks.forEach((block) => {
+        const state = detectCursorState(block, mouseX, mouseY);
+
+        if (state === "resize-x") {
+            templateCanvas.style.cursor = "ew-resize";
+            cursorSet = true;
+        } else if (state === "resize-y") {
+            templateCanvas.style.cursor = "ns-resize";
+            cursorSet = true;
+        } else if (state === "move") {
+            templateCanvas.style.cursor = "move";
+            cursorSet = true;
+        } else if (state === "text") {
+            templateCanvas.style.cursor = "text";
+            cursorSet = true;
+        }
+    });
+
+    if (!cursorSet) {
+        templateCanvas.style.cursor = "default";
+    }
+});
 
 
 let dragStart = null;
@@ -298,8 +419,6 @@ function moveCursorWithMouse(block, x, y) {
     drawCanvas();
 }
 
-
-
 // Обработка кликов мыши
 templateCanvas.addEventListener("mousedown", (event) => {
     const rect = templateCanvas.getBoundingClientRect();
@@ -335,6 +454,8 @@ templateCanvas.addEventListener("mousedown", (event) => {
 
     drawCanvas();
 });
+
+
 document.addEventListener("mouseup", () => {
     isDragging = false;
     isResizing = false;
