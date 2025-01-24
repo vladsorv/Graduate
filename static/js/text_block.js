@@ -68,19 +68,20 @@ function wrapText(text, fontSize, blockWidth) {
         lines.push(currentLine);
     }
 
+    // Возвращаем результат как массив строк с символами новой строки "\n"
     return lines;
 }
 
 
+
 function drawTextBlocks(ctx) {
     textBlocks.forEach((block) => {
-        // Разбиваем текст на строки с учетом ширины блока
         const wrappedText = wrapText(block.text, block.fontSize, block.width);
-        
+
         // Автоматическая корректировка высоты блока под текст
         const requiredHeight = wrappedText.length * block.fontSize + 10;
         if (block.height < requiredHeight) {
-            block.height = requiredHeight;
+            block.height = requiredHeight; // Обновление высоты блока
         }
 
         // Рисуем рамку блока
@@ -107,15 +108,16 @@ function drawTextBlocks(ctx) {
 
 function drawCursor(ctx, block) {
     const cursorPosition = block.cursorPosition;
-    const lines = block.text.split("\n");
-    const currentLine = lines[cursorPosition.line] || "";
-    const textWidth = ctx.measureText(currentLine.slice(0, cursorPosition.char)).width;
+    const wrappedText = wrapText(block.text, block.fontSize, block.width);  // Используем обёртку текста
+    const currentLine = wrappedText[cursorPosition.line] || "";  // Получаем текущую строку по позиции курсора
+    const textWidth = ctx.measureText(currentLine.slice(0, cursorPosition.char)).width;  // Вычисляем ширину текста до курсора
 
+    // Расположение курсора с учётом ширины блока и выравнивания текста
     const cursorX = block.x + (block.width - ctx.measureText(currentLine).width) / 2 + textWidth;
     const cursorY = block.y + (cursorPosition.line + 1) * block.fontSize;
 
     if (cursorY > block.y + block.height) {
-        block.height += block.fontSize;
+        block.height += block.fontSize;  // Увеличиваем высоту блока, если курсор выходит за пределы
     }
 
     ctx.beginPath();
@@ -390,7 +392,7 @@ function moveCursorWithMouse(block, x, y) {
     const textStartX = block.x + (block.width - totalTextWidth) / 2;
 
     if (x < textStartX) {
-        block.cursorPosition = { line: lineIndex, char: 0 }; // Устанавливаем курсор для блока
+        block.cursorPosition = { line: lineIndex, char: 0 };
         drawCanvas();
         return;
     }
@@ -415,9 +417,11 @@ function moveCursorWithMouse(block, x, y) {
         accumulatedWidth += charWidth;
     }
 
-    block.cursorPosition = { line: lineIndex, char: charIndex }; // Сохраняем курсор для блока
+    block.cursorPosition = { line: lineIndex, char: charIndex };
     drawCanvas();
 }
+
+
 
 // Обработка кликов мыши
 templateCanvas.addEventListener("mousedown", (event) => {
@@ -507,33 +511,28 @@ document.addEventListener("keydown", (event) => {
             );
         }
     } else if (event.key === "Enter") {
-        // Разделение текущей строки на две части
         const currentLine = lines[cursorPosition.line];
-        const beforeCursor = currentLine.slice(0, cursorPosition.char); // Текст до курсора
-        const afterCursor = currentLine.slice(cursorPosition.char); // Текст после курсора
-
-        // Обновляем текущую строку
+        const beforeCursor = currentLine.slice(0, cursorPosition.char);
+        const afterCursor = currentLine.slice(cursorPosition.char);
+    
+        // Разделяем строку и добавляем новую строку
         lines[cursorPosition.line] = beforeCursor;
-        
-        // Вставляем новую строку с текстом после курсора
         lines.splice(cursorPosition.line + 1, 0, afterCursor);
-
-        // Перемещаем курсор на новую строку в начало
+    
         cursorPosition.line++;
         cursorPosition.char = 0;
-
+    
         // Обновляем текст блока
         block.text = lines.join("\n");
-
+    
         // Автоматическая корректировка высоты блока
         const requiredHeight = lines.length * block.fontSize + 10;
         if (block.height < requiredHeight) {
             block.height = requiredHeight;
         }
-
+    
         // Перерисовываем холст
         drawCanvas();
-        return; // Завершаем обработчик
     } else if (event.key === "Backspace") {
         if (cursorPosition.char > 0) {
             // Удаление символа внутри строки

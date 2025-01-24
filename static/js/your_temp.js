@@ -80,11 +80,11 @@ document.addEventListener("DOMContentLoaded", () => {
             tempCtx.font = `${block.fontSize}px ${block.fontFamily}`;
             tempCtx.textAlign = block.align;
             tempCtx.fillStyle = "black";
-
-            // Многострочная отрисовка текста
-            const lines = block.text.split("\n");
+        
+            // Обработать автоматический перенос текста
+            const lines = wrapText(block.text, block.fontSize, block.width);
             lines.forEach((line, i) => {
-                const textX = block.x + block.width / 2; // Центрирование текста
+                const textX = block.x + block.width / 2;
                 const textY = block.y + block.padding + (i + 1) * block.fontSize;
                 tempCtx.fillText(line, textX, textY);
             });
