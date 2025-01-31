@@ -159,6 +159,82 @@ def save_template():
         logger.error(f"Ошибка при сохранении шаблона: {e}")
         return jsonify({"success": False, "error": str(e)})
 
+@app.route('/upload-csv', methods=['POST'])
+def upload_csv():
+    # Проверяем, был ли загружен файл
+    if 'csvFile' not in request.files:
+        return jsonify(success=False, error="Файл CSV не был загружен."), 400
+
+    file = request.files['csvFile']
+
+    # Проверяем формат файла
+    if not file.filename.endswith('.csv'):
+        return jsonify(success=False, error="Неверный формат файла. Загрузите CSV-файл."), 400
+
+    try:
+        # Парсинг CSV-файла
+        file_data = file.read().decode('utf-8')
+        csv_reader = csv.reader(file_data.splitlines())
+        
+        # Извлекаем имена (например, первую колонку)
+        names = [row[0].strip() for row in csv_reader if row]
+
+        if not names:
+            return jsonify(success=False, error="CSV-файл пуст или содержит некорректные данные."), 400
+
+        # Возвращаем список имён
+        return jsonify(success=True, names=names)
+
+    except Exception as e:
+        return jsonify(success=False, error=f"Ошибка обработки файла: {str(e)}"), 500
+
+@app.route('/save-my-template', methods=['POST'])
+def save_my_template():
+    data = request.get_json()
+
+    if not data:
+        return jsonify(success=False, error="Данные не переданы."), 400
+
+    try:
+        # Получаем данные изображения и имени файла
+        image_data = data.get("imageData")
+        filename = data.get("filename", "template.pdf")  # Имя PDF-файла
+
+        if not image_data or not filename:
+            return jsonify(success=False, error="Отсутствуют данные изображения или имя файла."), 400
+
+        # Декодируем изображение из Base64
+        image_data = image_data.split(",")[1]  # Убираем префикс 'data:image/png;base64,'
+        image_bytes = base64.b64decode(image_data)
+
+        # Конвертируем в изображение
+        image = Image.open(io.BytesIO(image_bytes))
+        os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+        # Сохраняем PDF-файл
+        pdf_output_path = os.path.join(OUTPUT_FOLDER, "template_with_text.pdf")
+        if image.mode == 'RGBA':  # Конвертируем, если изображение в формате RGBA
+            image = image.convert('RGB')
+        image.save(pdf_output_path, "PDF", resolution=100.0)
+
+        # Проверяем, требуется ли вернуть ссылку для скачивания архива
+        if "last_template" in data and data["last_template"]:
+            # Создаём ZIP-архив с PDF-файлами
+            zip_path = os.path.join(OUTPUT_FOLDER, "templates.zip")
+            with zipfile.ZipFile(zip_path, "w") as zipf:
+                for file in os.listdir(OUTPUT_FOLDER):
+                    file_path = os.path.join(OUTPUT_FOLDER, file)
+                    if file.endswith(".pdf"):  # Добавляем только PDF
+                        zipf.write(file_path, os.path.basename(file_path))
+
+            return jsonify(success=True, downloadUrl=f"/download/{os.path.basename(zip_path)}")
+
+        return jsonify(success=True)
+
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении шаблона: {e}")
+        return jsonify(success=False, error=f"Ошибка сохранения шаблона: {str(e)}"), 500
+
 @app.route("/download/<path:filename>")
 def download_file(filename):
     try:

@@ -76,47 +76,132 @@ document.addEventListener("DOMContentLoaded", () => {
             tempCtx.drawImage(templateImage, 0, 0, FIXED_WIDTH, FIXED_HEIGHT);
         }
 
-        textBlocks.forEach((block) => {
-            tempCtx.font = `${block.fontSize}px ${block.fontFamily}`;
-            tempCtx.textAlign = block.align;
-            tempCtx.fillStyle = "black";
-        
-            // Обработать автоматический перенос текста
-            const lines = wrapText(block.text, block.fontSize, block.width);
-            lines.forEach((line, i) => {
-                const textX = block.x + block.width / 2;
-                const textY = block.y + block.padding + (i + 1) * block.fontSize;
-                tempCtx.fillText(line, textX, textY);
+        const containsPlaceholder = textBlocks.some((block) => block.text.includes("%ФИО"));
+
+        if (!containsPlaceholder) {
+            textBlocks.forEach((block) => {
+                tempCtx.font = `${block.fontSize}px ${block.fontFamily}`;
+                tempCtx.textAlign = block.align;
+                tempCtx.fillStyle = "black";
+            
+                // Обработать автоматический перенос текста
+                const lines = wrapText(block.text, block.fontSize, block.width);
+                lines.forEach((line, i) => {
+                    const textX = block.x + block.width / 2;
+                    const textY = block.y + block.padding + (i + 1) * block.fontSize;
+                    tempCtx.fillText(line, textX, textY);
+                });
             });
-        });
-
-        const imageData = tempCanvas.toDataURL("image/png");
-
-        fetch("/save-template", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                imageData,
-                textBlocks,
-            }),
-        })
-            .then((response) => response.json())
-            .then((data) => {
-                if (data.success) {
-                    alert("Шаблон успешно сохранён!");
-                    if (data.downloadUrl) {
-                        window.location.href = data.downloadUrl;
-                    }
-                } else {
-                    alert(`Ошибка: ${data.error}`);
-                }
+    
+            const imageData = tempCanvas.toDataURL("image/png");
+    
+            fetch("/save-template", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    imageData,
+                    textBlocks,
+                }),
             })
-            .catch((error) => {
-                console.error("Ошибка при отправке данных на сервер:", error);
-            });
-    });
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.success) {
+                        alert("Шаблон успешно сохранён!");
+                        if (data.downloadUrl) {
+                            window.location.href = data.downloadUrl;
+                        }
+                    } else {
+                        alert(`Ошибка: ${data.error}`);
+                    }
+                })
+                .catch((error) => {
+                    console.error("Ошибка при отправке данных на сервер:", error);
+                });
+        } else {
+            // Если %ФИО найдено, загружаем CSV и создаём несколько шаблонов
+            const csvInput = document.getElementById("csvFile").files[0];
+        
+            if (!csvInput) {
+                alert("Пожалуйста, загрузите CSV-файл с ФИО.");
+                return;
+            }
+        
+            const formData = new FormData();
+            formData.append("csvFile", csvInput);
+        
+            // Отправляем CSV на сервер для обработки
+            fetch("/upload-csv", {
+                method: "POST",
+                body: formData,
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (!data.success) {
+                        alert(`Ошибка при загрузке CSV: ${data.error}`);
+                        return;
+                    }
+        
+                    // Сервер возвращает список имён из CSV
+                    const names = data.names;
+        
+                    names.forEach((name, index) => {
+                        // Создаём новый холст для каждой записи
+                        tempCtx.clearRect(0, 0, FIXED_WIDTH, FIXED_HEIGHT);
+                        if (templateImage) {
+                            tempCtx.drawImage(templateImage, 0, 0, FIXED_WIDTH, FIXED_HEIGHT);
+                        }
+        
+                        textBlocks.forEach((block) => {
+                            tempCtx.font = `${block.fontSize}px ${block.fontFamily}`;
+                            tempCtx.textAlign = block.align;
+                            tempCtx.fillStyle = "black";
+        
+                            // Заменяем %ФИО на текущее имя
+                            const blockText = block.text.replace("%ФИО", name);
+        
+                            // Обработать автоматический перенос текста
+                            const lines = wrapText(blockText, block.fontSize, block.width);
+                            lines.forEach((line, i) => {
+                                const textX = block.x + block.width / 2;
+                                const textY = block.y + block.padding + (i + 1) * block.fontSize;
+                                tempCtx.fillText(line, textX, textY);
+                            });
+                        });
+        
+                        const imageData = tempCanvas.toDataURL("image/png");
+        
+                        fetch("/save-my-template", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                                imageData,
+                                textBlocks,
+                                filename: `template_${index + 1}.pdf`, // Изменено на PDF
+                            }),
+                        })
+                            .then((response) => response.json())
+                            .then((data) => {
+                                if (data.success && index === names.length - 1) {
+                                    alert("Все грамоты успешно сохранены!");
+                                    if (data.downloadUrl) {
+                                        window.location.href = data.downloadUrl;
+                                    }
+                                }
+                            })
+                            .catch((error) => {
+                                console.error("Ошибка при сохранении шаблона:", error);
+                            });
+                    });
+                })
+                .catch((error) => {
+                    console.error("Ошибка при обработке CSV:", error);
+                });
+        }
+    });      
 
     // Обработка событий мыши для изменения размеров или перемещения блока
     templateCanvas.addEventListener("mousedown", (event) => {
