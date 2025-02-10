@@ -3,6 +3,7 @@ import re
 import io
 import csv
 import os
+import zipfile
 from flask import Flask, jsonify, render_template, request, send_file
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
@@ -212,7 +213,7 @@ def save_my_template():
         os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
         # Сохраняем PDF-файл
-        pdf_output_path = os.path.join(OUTPUT_FOLDER, "template_with_text.pdf")
+        pdf_output_path = os.path.join(OUTPUT_FOLDER, filename)
         if image.mode == 'RGBA':  # Конвертируем, если изображение в формате RGBA
             image = image.convert('RGB')
         image.save(pdf_output_path, "PDF", resolution=100.0)

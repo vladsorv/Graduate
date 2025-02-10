@@ -12,6 +12,12 @@
         <input type="file" id="templateUpload" accept="image/*">
         <button id="addTextBlock">Добавить текстовый блок</button>
         <button id="saveTemplate">Сохранить</button>
+        <form id="uploadCsvForm" enctype="multipart/form-data">
+            <label for="csvFile">Загрузить CSV с ФИО:</label>
+            <input type="file" id="csvFile" name="file" accept=".csv" />
+            <button type="submit">Генерировать грамоты</button>
+        </form>
+        <div id="csvUploadStatus"></div>
         <div id="templateArea">
             <canvas id="templateCanvas"></canvas>
         </div>

@@ -122,15 +122,15 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
             // Если %ФИО найдено, загружаем CSV и создаём несколько шаблонов
             const csvInput = document.getElementById("csvFile").files[0];
-        
+
             if (!csvInput) {
                 alert("Пожалуйста, загрузите CSV-файл с ФИО.");
                 return;
             }
-        
+
             const formData = new FormData();
             formData.append("csvFile", csvInput);
-        
+
             // Отправляем CSV на сервер для обработки
             fetch("/upload-csv", {
                 method: "POST",
@@ -142,25 +142,25 @@ document.addEventListener("DOMContentLoaded", () => {
                         alert(`Ошибка при загрузке CSV: ${data.error}`);
                         return;
                     }
-        
+
                     // Сервер возвращает список имён из CSV
                     const names = data.names;
-        
+
                     names.forEach((name, index) => {
                         // Создаём новый холст для каждой записи
                         tempCtx.clearRect(0, 0, FIXED_WIDTH, FIXED_HEIGHT);
                         if (templateImage) {
                             tempCtx.drawImage(templateImage, 0, 0, FIXED_WIDTH, FIXED_HEIGHT);
                         }
-        
+
                         textBlocks.forEach((block) => {
                             tempCtx.font = `${block.fontSize}px ${block.fontFamily}`;
                             tempCtx.textAlign = block.align;
                             tempCtx.fillStyle = "black";
-        
+
                             // Заменяем %ФИО на текущее имя
                             const blockText = block.text.replace("%ФИО", name);
-        
+
                             // Обработать автоматический перенос текста
                             const lines = wrapText(blockText, block.fontSize, block.width);
                             lines.forEach((line, i) => {
@@ -169,9 +169,9 @@ document.addEventListener("DOMContentLoaded", () => {
                                 tempCtx.fillText(line, textX, textY);
                             });
                         });
-        
+
                         const imageData = tempCanvas.toDataURL("image/png");
-        
+
                         fetch("/save-my-template", {
                             method: "POST",
                             headers: {
