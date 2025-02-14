@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="../static/css/document.css" rel="stylesheet">
+    <title>Загрузка файлов</title>
+</head>
+<body>
+    <h2>Загрузите CSV- и Word-файл</h2>
+    <form id="uploadForm" enctype="multipart/form-data" method="POST" action="/document/download">
+        <input type="file" id="csvFile" name="csvFile" accept=".csv" required>
+        <input type="file" id="wordFile" name="wordFile" accept=".doc,.docx" required>
+        <button type="submit">Загрузить</button>
+    </form>
+    <button id="downloadBtn" disabled>
+        <a href="#" id="downloadLink" style="color: inherit; text-decoration: none;">Скачать обработанный файл</a>
+    </button>
+
+    <script>
+        // Обработчик загрузки формы
+        document.getElementById('uploadForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(this);
+            fetch('/document/download', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Активируем кнопку для скачивания
+                    document.getElementById('downloadBtn').disabled = false;
+                    document.getElementById('downloadLink').href = 'output/documents.zip';
+                } else {
+                    alert('Произошла ошибка при загрузке файлов');
+                }
+            })
+            .catch(error => {
+                alert('Произошла ошибка: ' + error);
+            });
+        });
+    </script>
+</body>
+</html>
