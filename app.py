@@ -278,7 +278,7 @@ def upload_files():
         word_file = request.files["wordFile"]
         
         # Читаем CSV
-        df = pd.read_csv(csv_file, encoding='utf-8', header=None)
+        df = pd.read_csv(csv_file, encoding='utf-8', delimiter=';', header=0)
         if df.shape[1] < 1:
             return "CSV файл должен содержать хотя бы один столбец", 400
         
@@ -290,9 +290,32 @@ def upload_files():
         
         output_files = []
         
+        # Функция для корректной замены текста в runs
+        def replace_text_in_paragraph(paragraph, replacements):
+            full_text = "".join(run.text for run in paragraph.runs)
+            for old_text, new_text in replacements.items():
+                if old_text in full_text:
+                    full_text = full_text.replace(old_text, new_text)
+                    for run in paragraph.runs:
+                        run.text = ""  # Очищаем старые данные
+                    paragraph.add_run(full_text)  # Вставляем новый текст с сохранением стилей
+
+        # Проходим по каждой строке в CSV и заменяем соответствующие теги
         for index, row in df.iterrows():
-            person_name = row[0]  # Берем ФИО из CSV
-            logging.info(f"Обрабатываем: {person_name}")
+            replacements = {}
+
+            # Создаем замену для каждого столбца (например, %ФИО и %title)
+            for col in df.columns:
+                tag = f"%{col.strip()}"  # Убираем лишние пробелы и добавляем один процент
+                tag = tag.replace("%%", "%")  # Заменяем два процента на один
+                replacements[tag] = str(row[col]).strip()  # Добавляем в словарь
+
+            logging.info(f"Заменяем теги для строки {index + 1}: {replacements}")
+
+            # Если замен нет, продолжаем обработку
+            if not replacements:
+                logging.warning(f"Нет тегов для замены в строке {index + 1}")
+                continue
 
             # Создаем копию оригинального документа
             doc_path = os.path.join(temp_folder, f"generated_{index + 1}.docx")
@@ -300,32 +323,23 @@ def upload_files():
             
             new_doc = Document(doc_path)
 
-            # Функция для корректной замены текста в runs
-            def replace_text_in_paragraph(paragraph, old_text, new_text):
-                full_text = "".join(run.text for run in paragraph.runs)
-                if old_text in full_text:
-                    full_text = full_text.replace(old_text, new_text)
-                    for run in paragraph.runs:
-                        run.text = ""  # Очищаем старые данные
-                    paragraph.add_run(full_text)  # Вставляем новый текст с сохранением стилей
-
-            # Заменяем %ФИО в параграфах
+            # Заменяем теги в параграфах
             for paragraph in new_doc.paragraphs:
-                replace_text_in_paragraph(paragraph, "%ФИО", person_name)
+                replace_text_in_paragraph(paragraph, replacements)
 
-            # Обрабатываем таблицы (они работают аналогично параграфам)
+            # Обрабатываем таблицы
             for table in new_doc.tables:
                 for row in table.rows:
                     for cell in row.cells:
                         for paragraph in cell.paragraphs:
-                            replace_text_in_paragraph(paragraph, "%ФИО", person_name)
+                            replace_text_in_paragraph(paragraph, replacements)
 
-            # Обрабатываем колонтитулы (верхний и нижний)
+            # Обрабатываем колонтитулы
             for section in new_doc.sections:
                 for paragraph in section.header.paragraphs:
-                    replace_text_in_paragraph(paragraph, "%ФИО", person_name)
+                    replace_text_in_paragraph(paragraph, replacements)
                 for paragraph in section.footer.paragraphs:
-                    replace_text_in_paragraph(paragraph, "%ФИО", person_name)
+                    replace_text_in_paragraph(paragraph, replacements)
 
             # Сохраняем измененный документ
             new_doc.save(doc_path)
@@ -340,6 +354,7 @@ def upload_files():
         return send_file(zip_path, as_attachment=True)
     
     return render_template("document.html")
+
 
 @app.route("/output/<filename>")
 def download_doc(filename):
