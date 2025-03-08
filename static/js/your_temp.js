@@ -76,7 +76,7 @@ document.addEventListener("DOMContentLoaded", () => {
             tempCtx.drawImage(templateImage, 0, 0, FIXED_WIDTH, FIXED_HEIGHT);
         }
 
-        const containsPlaceholder = textBlocks.some((block) => block.text.includes("%ФИО"));
+        const containsPlaceholder = textBlocks.some((block) => /%[a-zA-Z0-9_а-яА-ЯёЁ]+/.test(block.text));
 
         if (!containsPlaceholder) {
             textBlocks.forEach((block) => {
@@ -120,11 +120,16 @@ document.addEventListener("DOMContentLoaded", () => {
                     console.error("Ошибка при отправке данных на сервер:", error);
                 });
         } else {
+            // Функция для замены всех тегов, начинающихся с '%'
+            function replaceTagsInText(text, record) {
+                return text.replace(/%[a-zA-Z0-9_а-яА-Я]+/g, (tag) => record[tag] || tag);
+            }
+
             // Если %ФИО найдено, загружаем CSV и создаём несколько шаблонов
             const csvInput = document.getElementById("csvFile").files[0];
 
             if (!csvInput) {
-                alert("Пожалуйста, загрузите CSV-файл с ФИО.");
+                alert("Пожалуйста, загрузите CSV-файл с данными.");
                 return;
             }
 
@@ -143,11 +148,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         return;
                     }
 
-                    // Сервер возвращает список имён из CSV
-                    const names = data.names;
+                    const records = data.records;
 
-                    names.forEach((name, index) => {
-                        // Создаём новый холст для каждой записи
+                    records.forEach((record, index) => {
                         tempCtx.clearRect(0, 0, FIXED_WIDTH, FIXED_HEIGHT);
                         if (templateImage) {
                             tempCtx.drawImage(templateImage, 0, 0, FIXED_WIDTH, FIXED_HEIGHT);
@@ -158,8 +161,8 @@ document.addEventListener("DOMContentLoaded", () => {
                             tempCtx.textAlign = block.align;
                             tempCtx.fillStyle = "black";
 
-                            // Заменяем %ФИО на текущее имя
-                            const blockText = block.text.replace("%ФИО", name);
+                            // Заменяем текст в блоке на основе данных из CSV
+                            const blockText = replaceTagsInText(block.text, record);
 
                             // Обработать автоматический перенос текста
                             const lines = wrapText(blockText, block.fontSize, block.width);
@@ -180,12 +183,12 @@ document.addEventListener("DOMContentLoaded", () => {
                             body: JSON.stringify({
                                 imageData,
                                 textBlocks,
-                                filename: `template_${index + 1}.pdf`, // Изменено на PDF
+                                filename: `template_${index + 1}.pdf`,
                             }),
                         })
                             .then((response) => response.json())
                             .then((data) => {
-                                if (data.success && index === names.length - 1) {
+                                if (data.success && index === records.length - 1) {
                                     alert("Все грамоты успешно сохранены!");
                                     if (data.downloadUrl) {
                                         window.location.href = data.downloadUrl;

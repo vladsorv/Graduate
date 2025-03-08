@@ -5,7 +5,7 @@ import csv
 import os
 from shutil import copyfile
 import zipfile
-from flask import Flask, jsonify, render_template, request, send_file, send_from_directory
+from flask import Flask, json, jsonify, render_template, request, send_file, send_from_directory
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
 from PIL import Image
@@ -180,19 +180,35 @@ def upload_csv():
     try:
         # Парсинг CSV-файла
         file_data = file.read().decode('utf-8')
-        csv_reader = csv.reader(file_data.splitlines())
-        
-        # Извлекаем имена (например, первую колонку)
-        names = [row[0].strip() for row in csv_reader if row]
 
-        if not names:
+        # Убираем BOM, если он есть
+        if file_data.startswith('\ufeff'):
+            file_data = file_data[1:]
+
+        csv_reader = csv.reader(file_data.splitlines(), delimiter=';')
+
+        # Чтение заголовков (первый ряд)
+        headers = next(csv_reader)
+
+        # Извлекаем данные строк (все остальные ряды)
+        records = [dict(zip(headers, row)) for row in csv_reader]
+
+        if not records:
             return jsonify(success=False, error="CSV-файл пуст или содержит некорректные данные."), 400
 
-        # Возвращаем список имён
-        return jsonify(success=True, names=names)
+        # Создаем JSON-ответ
+        response_data = {"success": True, "headers": headers, "records": records}
+
+        # Логируем JSON в консоль
+        print(json.dumps(response_data, ensure_ascii=False, indent=4))
+
+        # Возвращаем заголовки и записи данных
+        return jsonify(response_data)
 
     except Exception as e:
         return jsonify(success=False, error=f"Ошибка обработки файла: {str(e)}"), 500
+
+import os
 
 @app.route('/save-my-template', methods=['POST'])
 def save_my_template():
@@ -210,32 +226,30 @@ def save_my_template():
             return jsonify(success=False, error="Отсутствуют данные изображения или имя файла."), 400
 
         # Декодируем изображение из Base64
-        image_data = image_data.split(",")[1]  # Убираем префикс 'data:image/png;base64,'
+        image_data = image_data.split(",")[1]  # Убираем префикс 'data:image/png;base64,' 
         image_bytes = base64.b64decode(image_data)
 
         # Конвертируем в изображение
         image = Image.open(io.BytesIO(image_bytes))
-        os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+        os.makedirs(os.getcwd(), exist_ok=True)  # Используем текущую директорию
 
         # Сохраняем PDF-файл
-        pdf_output_path = os.path.join(OUTPUT_FOLDER, filename)
+        pdf_output_path = os.path.join(os.getcwd(), filename)
         if image.mode == 'RGBA':  # Конвертируем, если изображение в формате RGBA
             image = image.convert('RGB')
         image.save(pdf_output_path, "PDF", resolution=100.0)
 
-        # Проверяем, требуется ли вернуть ссылку для скачивания архива
-        if "last_template" in data and data["last_template"]:
-            # Создаём ZIP-архив с PDF-файлами
-            zip_path = os.path.join(OUTPUT_FOLDER, "templates.zip")
-            with zipfile.ZipFile(zip_path, "w") as zipf:
-                for file in os.listdir(OUTPUT_FOLDER):
-                    file_path = os.path.join(OUTPUT_FOLDER, file)
-                    if file.endswith(".pdf"):  # Добавляем только PDF
-                        zipf.write(file_path, os.path.basename(file_path))
+        # Создаем ZIP-архив с PDF-файлами
+        zip_path = os.path.join(os.getcwd(), "templates.zip")
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            # Добавляем только PDF-файлы
+            for file in os.listdir(os.getcwd()):
+                file_path = os.path.join(os.getcwd(), file)
+                if file.endswith(".pdf"):  # Добавляем только PDF
+                    zipf.write(file_path, os.path.basename(file_path))
 
-            return jsonify(success=True, downloadUrl=f"/download/{os.path.basename(zip_path)}")
-
-        return jsonify(success=True)
+        # Возвращаем ссылку на скачивание архива
+        return jsonify(success=True, downloadUrl=f"/download/{os.path.basename(zip_path)}")
 
     except Exception as e:
         logger.error(f"Ошибка при сохранении шаблона: {e}")
