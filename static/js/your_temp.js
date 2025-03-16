@@ -124,18 +124,18 @@ document.addEventListener("DOMContentLoaded", () => {
             function replaceTagsInText(text, record) {
                 return text.replace(/%[a-zA-Z0-9_а-яА-Я]+/g, (tag) => record[tag] || tag);
             }
-
+            
             // Если %ФИО найдено, загружаем CSV и создаём несколько шаблонов
             const csvInput = document.getElementById("csvFile").files[0];
-
+            
             if (!csvInput) {
                 alert("Пожалуйста, загрузите CSV-файл с данными.");
                 return;
             }
-
+            
             const formData = new FormData();
             formData.append("csvFile", csvInput);
-
+            
             // Отправляем CSV на сервер для обработки
             fetch("/upload-csv", {
                 method: "POST",
@@ -147,23 +147,28 @@ document.addEventListener("DOMContentLoaded", () => {
                         alert(`Ошибка при загрузке CSV: ${data.error}`);
                         return;
                     }
-
-                    const records = data.records;
-
+            
+                    let records = data.records;
+            
+                    // Фильтрация пустых записей
+                    records = records.filter(record => record["%ФИО"] && record["%title"]);
+            
+                    console.log("Фильтрованные записи:", records);
+            
                     records.forEach((record, index) => {
                         tempCtx.clearRect(0, 0, FIXED_WIDTH, FIXED_HEIGHT);
                         if (templateImage) {
                             tempCtx.drawImage(templateImage, 0, 0, FIXED_WIDTH, FIXED_HEIGHT);
                         }
-
+            
                         textBlocks.forEach((block) => {
                             tempCtx.font = `${block.fontSize}px ${block.fontFamily}`;
                             tempCtx.textAlign = block.align;
                             tempCtx.fillStyle = "black";
-
+            
                             // Заменяем текст в блоке на основе данных из CSV
                             const blockText = replaceTagsInText(block.text, record);
-
+            
                             // Обработать автоматический перенос текста
                             const lines = wrapText(blockText, block.fontSize, block.width);
                             lines.forEach((line, i) => {
@@ -172,9 +177,9 @@ document.addEventListener("DOMContentLoaded", () => {
                                 tempCtx.fillText(line, textX, textY);
                             });
                         });
-
+            
                         const imageData = tempCanvas.toDataURL("image/png");
-
+            
                         fetch("/save-my-template", {
                             method: "POST",
                             headers: {
@@ -201,7 +206,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 })
                 .catch((error) => {
-                    console.error("Ошибка при обработке CSV:", error);
+                    console.error("Ошибка при загрузке CSV:", error);
                 });
         }
     });      

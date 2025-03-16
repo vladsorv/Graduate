@@ -33,3 +33,11 @@ canvas {
     display: block;
     margin: 0 auto;
 }
+.controls-row {
+    display: flex;
+    justify-content: center;
+}
+.home {
+    display: flex;
+    justify-content: center;
+}
