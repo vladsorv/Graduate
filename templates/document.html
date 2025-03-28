@@ -4,20 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="../static/css/document.css" rel="stylesheet">
+    <link rel="stylesheet" href="../static/css/bootstrap/bootstrap.css">
     <title>Загрузка файлов</title>
 </head>
 <body>
-    <h2>Загрузите CSV- и Word-файл</h2>
+    <h2 class="mb-4">Загрузите CSV- и Word-файл</h2>
     <form id="uploadForm" enctype="multipart/form-data" method="POST" action="/document/download">
-        <input type="file" id="csvFile" name="csvFile" accept=".csv" required>
-        <input type="file" id="wordFile" name="wordFile" accept=".doc,.docx" required>
-        <button type="submit">Загрузить</button>
+        <div class="input-group mb-1">
+            <label for="csvFile" class="input-group-text">Загрузите CSV с тегами:</label>
+            <input type="file" id="csvFile" name="csvFile" accept=".csv" class="form-control" required>
+        </div>
+        <div class="input-group mb-1">
+            <label for="wordFile" class="input-group-text" style="width: 200px;">Загрузите .doc/.docx:</label>
+            <input type="file" id="wordFile" name="wordFile" accept=".doc,.docx" class="form-control" required>
+        </div>
+        <button class="btn btn-primary" type="submit">Загрузить</button>
     </form>
-    <button id="downloadBtn" disabled>
+    <button class="btn btn-primary" id="downloadBtn" style="margin-bottom: 10px;" disabled>
         <a href="#" id="downloadLink" style="color: inherit; text-decoration: none;">Скачать обработанный файл</a>
     </button>
-
+    <a href="../" class="btn btn-secondary">Вернуться на главную страницу</a>
     <script>
+        // Функция для блокировки кнопки скачивания
+        function disableDownloadButton() {
+            document.getElementById('downloadBtn').disabled = true;
+            document.getElementById('downloadLink').href = '#';
+        }
+
+        // Обработчики событий для полей ввода файлов
+        document.getElementById('csvFile').addEventListener('click', disableDownloadButton);
+        document.getElementById('wordFile').addEventListener('click', disableDownloadButton);
+
         // Обработчик загрузки формы
         document.getElementById('uploadForm').addEventListener('submit', function(event) {
             event.preventDefault();
