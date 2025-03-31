@@ -186,25 +186,17 @@ def upload_csv():
             file_data = file_data[1:]
 
         csv_reader = csv.reader(file_data.splitlines(), delimiter=';')
-
-        # Чтение заголовков (первый ряд)
         headers = next(csv_reader)
-
-        # Извлекаем данные строк (все остальные ряды)
-        records = [dict(zip(headers, row)) for row in csv_reader]
-
-        if not records:
-            return jsonify(success=False, error="CSV-файл пуст или содержит некорректные данные."), 400
-
-        # Создаем JSON-ответ
-        response_data = {"success": True, "headers": headers, "records": records}
-
-        # Логируем JSON в консоль
-        print(json.dumps(response_data, ensure_ascii=False, indent=4))
-
-        # Возвращаем заголовки и записи данных
-        return jsonify(response_data)
-
+        records = []
+        for row in csv_reader:
+            records.append({headers[i]: value for i, value in enumerate(row)})
+        
+        # Возвращаем данные с порядком столбцов
+        return jsonify({
+            "success": True,
+            "headers": headers,  # Важно: исходный порядок столбцов
+            "records": records
+        })
     except Exception as e:
         return jsonify(success=False, error=f"Ошибка обработки файла: {str(e)}"), 500
 

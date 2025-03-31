@@ -147,13 +147,24 @@ document.addEventListener("DOMContentLoaded", () => {
                         alert(`Ошибка при загрузке CSV: ${data.error}`);
                         return;
                     }
-            
+                    
                     let records = data.records;
-            
-                    // Фильтрация пустых записей
-                    records = records.filter(record => record["%ФИО"] && record["%title"]);
-            
-                    console.log("Фильтрованные записи:", records);
+                    // Удалите строку с фильтрацией по %ФИО и %title
+                    
+                    // 1. Получаем порядок столбцов из заголовка CSV
+                    const csvColumnsOrder = data.columns || []; // Сервер должен возвращать массив столбцов
+                    
+                    // 2. Собираем используемые теги
+                    const usedTags = new Set();
+                    textBlocks.forEach(block => {
+                        const tags = block.text.match(/%[\wа-яА-ЯёЁ]+/g) || [];
+                        tags.forEach(tag => usedTags.add(tag));
+                    });
+                    
+                    // 3. Фильтруем записи
+                    records = records.filter(record => 
+                        Array.from(usedTags).every(tag => record.hasOwnProperty(tag))
+                    );
             
                     records.forEach((record, index) => {
                         tempCtx.clearRect(0, 0, FIXED_WIDTH, FIXED_HEIGHT);
@@ -177,6 +188,47 @@ document.addEventListener("DOMContentLoaded", () => {
                                 tempCtx.fillText(line, textX, textY);
                             });
                         });
+                        // Заменяем весь блок определения имени файла на этот код:
+
+                        // Используем этот код сразу после получения данных с сервера
+                        const correctColumnOrder = Object.keys(records[0] || {});
+
+                        // Затем в вашем основном коде:
+
+                        // Используем ПРАВИЛЬНЫЙ порядок столбцов
+                        // 1. Получаем исходный порядок столбцов из сервера
+                        const csvHeaders = data.headers;
+
+                        // 2. Собираем ВСЕ теги из текстовых блоков (с %)
+                        const usedTags = [];
+                        textBlocks.forEach(block => {
+                            const tags = block.text.match(/%[a-zA-Z0-9_а-яА-ЯёЁ]+/g) || [];
+                            usedTags.push(...tags);
+                        });
+
+                        // 3. Находим первый столбец в исходном порядке, который есть в тегах
+                        let filenameColumn = null;
+                        for (const header of csvHeaders) {
+                            if (usedTags.includes(header)) {
+                                filenameColumn = header;
+                                break;
+                            }
+                        }
+
+                        // 4. Формируем имя файла
+                        let filename;
+                        if (filenameColumn && record[filenameColumn]) {
+                            filename = record[filenameColumn]
+                                .toString()
+                                .replace(/[^\wа-яА-ЯёЁ-]/gi, '_') // Заменяем спецсимволы на _
+                                .substring(0, 200);
+                        } else {
+                            filename = `template_${index + 1}`;
+                        }
+
+                        console.log('Выбранный столбец:', filenameColumn, 'Имя файла:', filename);
+                        // 6. Формируем окончательное имя файла
+                        const finalFilename = `${filename}.pdf`;
             
                         const imageData = tempCanvas.toDataURL("image/png");
             
@@ -188,7 +240,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             body: JSON.stringify({
                                 imageData,
                                 textBlocks,
-                                filename: `template_${index + 1}.pdf`,
+                                filename: finalFilename, // <-- используем новое имя
                             }),
                         })
                             .then((response) => response.json())
