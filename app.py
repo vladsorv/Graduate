@@ -37,6 +37,37 @@ pdfmetrics.registerFont(TTFont("DejaVu", FONT_PATH))
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+def extract_tags(doc):
+    """Извлекает все уникальные теги из документа, учитывая разбиение на runs"""
+    tags = set()
+    pattern = re.compile(r'(%\w+)')
+    
+    # Обработка параграфов
+    for paragraph in doc.paragraphs:
+        full_text = ''.join(run.text for run in paragraph.runs)
+        tags.update(pattern.findall(full_text))
+    
+    # Обработка таблиц
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    full_text = ''.join(run.text for run in paragraph.runs)
+                    tags.update(pattern.findall(full_text))
+    
+    # Обработка колонтитулов
+    for section in doc.sections:
+        # Header
+        for paragraph in section.header.paragraphs:
+            full_text = ''.join(run.text for run in paragraph.runs)
+            tags.update(pattern.findall(full_text))
+        # Footer
+        for paragraph in section.footer.paragraphs:
+            full_text = ''.join(run.text for run in paragraph.runs)
+            tags.update(pattern.findall(full_text))
+    
+    return tags
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -269,81 +300,90 @@ def upload_files():
         csv_file = request.files["csvFile"]
         word_file = request.files["wordFile"]
         
-        # Читаем CSV
-        df = pd.read_csv(csv_file, encoding='utf-8', delimiter=';', header=0)
-        if df.shape[1] < 1:
-            return "CSV файл должен содержать хотя бы один столбец", 400
-        
-        logging.info(f"CSV загружен: {len(df)} записей")
-        
-        # Сохраняем загруженный Word-файл во временную папку
-        original_word_path = os.path.join(temp_folder, "original.docx")
-        word_file.save(original_word_path)
-        
-        output_files = []
-        
-        # Функция для корректной замены текста в runs
-        def replace_text_in_paragraph(paragraph, replacements):
-            full_text = "".join(run.text for run in paragraph.runs)
-            for old_text, new_text in replacements.items():
-                if old_text in full_text:
-                    full_text = full_text.replace(old_text, new_text)
-                    for run in paragraph.runs:
-                        run.text = ""  # Очищаем старые данные
-                    paragraph.add_run(full_text)  # Вставляем новый текст с сохранением стилей
-
-        # Проходим по каждой строке в CSV и заменяем соответствующие теги
-        for index, row in df.iterrows():
-            replacements = {}
-
-            # Создаем замену для каждого столбца (например, %ФИО и %title)
-            for col in df.columns:
-                tag = f"%{col.strip()}"  # Убираем лишние пробелы и добавляем один процент
-                tag = tag.replace("%%", "%")  # Заменяем два процента на один
-                replacements[tag] = str(row[col]).strip()  # Добавляем в словарь
-
-            logging.info(f"Заменяем теги для строки {index + 1}: {replacements}")
-
-            # Если замен нет, продолжаем обработку
-            if not replacements:
-                logging.warning(f"Нет тегов для замены в строке {index + 1}")
-                continue
-
-            # Создаем копию оригинального документа
-            doc_path = os.path.join(temp_folder, f"generated_{index + 1}.docx")
-            copyfile(original_word_path, doc_path)
+        try:
+            # Чтение CSV с сохранением оригинальных названий
+            df = pd.read_csv(csv_file, encoding='utf-8', delimiter=';', header=0)
+            df.columns = [col.strip() for col in df.columns]  # Только пробелы
             
-            new_doc = Document(doc_path)
+            logger.info(f"CSV columns: {df.columns.tolist()}")
+            
+            if df.empty:
+                return "CSV файл пуст", 400
 
-            # Заменяем теги в параграфах
-            for paragraph in new_doc.paragraphs:
-                replace_text_in_paragraph(paragraph, replacements)
+            # Сохраняем Word-файл
+            original_word_path = os.path.join(temp_folder, "original.docx")
+            word_file.save(original_word_path)
+            
+            # Анализ тегов
+            doc = Document(original_word_path)
+            used_tags = extract_tags(doc)
+            logger.info(f"Найдены теги в документе: {used_tags}")
+            
+            # Определение используемых столбцов
+            used_columns = [col for col in df.columns if col in used_tags]
+            logger.info(f"Совпадающие столбцы: {used_columns}")
+            
+            if not used_columns:
+                return "Нет совпадений между тегами документа и CSV", 400
+                
+            filename_column = used_columns[0]
+            logger.info(f"Выбран столбец для имен файлов: {filename_column}")
+            
+            output_files = []
+            generated_names = set()
 
-            # Обрабатываем таблицы
-            for table in new_doc.tables:
-                for row in table.rows:
-                    for cell in row.cells:
-                        for paragraph in cell.paragraphs:
-                            replace_text_in_paragraph(paragraph, replacements)
+            # Генерация документов
+            for index, row in df.iterrows():
+                # Формирование имени файла
+                raw_name = str(row[filename_column])
+                clean_name = re.sub(r'[\\/*?:"<>|]', '', raw_name).strip()
+                safe_name = clean_name.replace(' ', '_')[:50]  # Ограничение длины
+                
+                # Уникализация имени
+                counter = 1
+                final_name = f"{safe_name}.docx"
+                while final_name in generated_names:
+                    final_name = f"{safe_name}_{counter}.docx"
+                    counter += 1
+                generated_names.add(final_name)
+                
+                # Копирование шаблона
+                doc_path = os.path.join(temp_folder, final_name)
+                copyfile(original_word_path, doc_path)
+                
+                # Замена тегов
+                doc = Document(doc_path)
+                replacements = {col: str(row[col]).strip() for col in df.columns}
+                
+                def replace_text(element):
+                    if element.text:
+                        for tag, value in replacements.items():
+                            element.text = element.text.replace(tag, value)
+                
+                # Обработка всего документа
+                for paragraph in doc.paragraphs:
+                    replace_text(paragraph)
+                    
+                for table in doc.tables:
+                    for row in table.rows:
+                        for cell in row.cells:
+                            for paragraph in cell.paragraphs:
+                                replace_text(paragraph)
+                
+                doc.save(doc_path)
+                output_files.append(doc_path)
 
-            # Обрабатываем колонтитулы
-            for section in new_doc.sections:
-                for paragraph in section.header.paragraphs:
-                    replace_text_in_paragraph(paragraph, replacements)
-                for paragraph in section.footer.paragraphs:
-                    replace_text_in_paragraph(paragraph, replacements)
-
-            # Сохраняем измененный документ
-            new_doc.save(doc_path)
-            output_files.append(doc_path)
+            # Архивирование
+            zip_path = os.path.join(temp_folder, "documents.zip")
+            with zipfile.ZipFile(zip_path, "w") as zipf:
+                for file in output_files:
+                    zipf.write(file, os.path.basename(file))
+            
+            return send_file(zip_path, as_attachment=True)
         
-        # Архивируем все файлы в ZIP
-        zip_path = os.path.join(temp_folder, "documents.zip")
-        with zipfile.ZipFile(zip_path, "w") as zipf:
-            for file in output_files:
-                zipf.write(file, os.path.basename(file))
-        
-        return send_file(zip_path, as_attachment=True)
+        except Exception as e:
+            logger.error(f"Ошибка: {str(e)}", exc_info=True)
+            return f"Ошибка обработки: {str(e)}", 500
     
     return render_template("document.html")
 
